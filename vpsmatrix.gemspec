@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
 
   spec.summary       = %q{Gem for easy deployment to VPS Matrix servers.}
   spec.description   = %q{Work in progress}
-  spec.homepage      = "http://www.timepress.cz."
+  spec.homepage      = "http://www.vpsmatrix.co.uk"
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or
   # delete this section to allow pushing this gem to any host.
