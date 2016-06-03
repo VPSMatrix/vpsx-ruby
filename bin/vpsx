@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+
+require 'vpsmatrix'
+Starter.start(ARGV)
