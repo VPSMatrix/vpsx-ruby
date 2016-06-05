@@ -1,5 +1,7 @@
 require 'thor'
 require 'digest'
+require 'net/http'
+require 'uri'
 
 class Starter < Thor
   include Thor::Actions
@@ -9,7 +11,7 @@ class Starter < Thor
 
     ##
     # check SSH key in .vpsmatrix dir, else generate new
-      # generate ~/.vpsmatrix/config
+      # generate ~/.vpsmatrix/config.yml
       # generate ~/.vpsmatrix/id_rsa.pub
 
     ## check for .vpsmatrix_config
@@ -21,37 +23,21 @@ class Starter < Thor
       # read API KEY
 
 
-    working_dir = Dir.pwd
-    list_of_files = Dir.glob "#{working_dir}/**/*"
-    files_string = ""
-
-    # TODO deal with images
-    list_of_files.map do |file|
-      files_string += "#{file}\n"
-      files_string += File.read(file)
+    # there should be only one SSH key for all apps right? So dir in home with general config and SSH key
+    # then one config file in app folder?
+    unless File.exists? ".vpsmatrix/id_rsa.pub"
+      # Generate SSH key
     end
 
+    @app_name = Dir.pwd.split(File::SEPARATOR).last
+    unless Config.new.content['api_key']
+      # ask for it to server
+      api_key = send_get_request "https://api.vpsmatrix.net/uploads/get_api_key", {ssh_key: ssh_key}
+      Config.new.write 'api_key', api_key
+    end
 
-    uri = URI("https://api.vpsmatrix.net/uploads/send_new_files")
-
-    http = Net::HTTP.new(uri.host, uri.port)
-    request = Net::HTTP::Post.new(uri.request_uri)
-
-    request.set_form_data({"file" => "string"})
-    response = http.request(request)
-
-
-    require "net/http"
-    require "uri"
-
-    # get files
-    uri = URI.parse("https://api.vpsmatrix.net/uploads/get_file_list")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    req = Net::HTTP::Get.new(uri.path)
-    req.basic_auth("test_app", "test_app")
-    http.request(req)
-
+    read_files
+    stream_file
 
     # https://api.vpsmatrix.net/uploads/get_new_files
 
@@ -88,7 +74,9 @@ class Starter < Thor
           end
         end
       end
+    end
 
+    def stream_file
       uri = URI.parse("https://api.vpsmatrix.net/uploads/send_new_files")
 
       # stream version
@@ -97,30 +85,37 @@ class Starter < Thor
         req.add_field('Transfer-Encoding', 'chunked')
         request.basic_auth("test_app", "test_app")
         req.body_stream = File.open("files_to_send")
-        #http.request(req)
 
-        #request = Net::HTTP::Put.new(uri.request_uri)
-        #request.set_form_data({"file" => File.read("files_to_send")})
         http.request request do |response|
-         # puts response
+          # puts response
           response.read_body do |chunk|
             puts chunk
           end
         end
       end
+    end
+
+    def send_put_request
+      uri = URI.parse("https://api.vpsmatrix.net/uploads/send_new_files")
 
       # no stream version
       Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
         request = Net::HTTP::Put.new(uri.request_uri)
         request.basic_auth("test_app", "test_app")
         request.set_form_data({"file" => File.read("files_to_send")})
-        http.request request #do |response|
-        #puts response
-        #response.read_body do |chunk|
-        #  puts chunk
-        #end
-        #end
+        http.request request
       end
+    end
+
+    def send_get_request endpoint, params={} #https://api.vpsmatrix.net/uploads/get_file_list
+      uri = URI.parse(endpoint)
+      uri.query = URI.encode_www_form(params)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      req = Net::HTTP::Get.new(uri.path)
+      req.basic_auth("test_app", "test_app")
+      http.request(req)
+      #res = Net::HTTP.get_response(uri)
     end
 
     def read_dirs
@@ -136,7 +131,4 @@ class Starter < Thor
       dirs_string
     end
   end
-
-
-
 end
