@@ -5,7 +5,7 @@ class Config
   def initialize
     @file_path = ".vps_matrix/config.yml"
     unless File.exists? @file_path
-      Dir.mkdir ".vpsmatrix"
+      Dir.mkdir ".vps_matrix"
       File.open(@file_path, 'w') do |file|
         file.write "comment: 'Config file for VPS Matrix services'"
       end

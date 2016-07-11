@@ -2,12 +2,13 @@ require 'thor'
 require 'digest'
 require 'net/http'
 require 'uri'
+require_relative 'config'
 
 class Starter < Thor
   include Thor::Actions
 
-  desc 'demo', 'run demo deploy to deploy app to VPS Matrix demo server'
-  def demo
+  desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
+  def demo task
 
     ##
     # check SSH key in .vpsmatrix dir, else generate new
@@ -27,11 +28,13 @@ class Starter < Thor
     # then one config file in app folder?
     unless File.exists? ".vpsmatrix/id_rsa.pub"
       # Generate SSH key
+      ssh_key = 'HFKNGEWIUHENINHSLN867G5867BDI7BOQ8YWQF9YFN9QWF'
     end
 
     @app_name = Dir.pwd.split(File::SEPARATOR).last
     unless Config.new.content['api_key']
       # ask for it to server
+      # TODO check if server returns api_key
       api_key = send_get_request "https://api.vpsmatrix.net/uploads/get_api_key", {ssh_key: ssh_key}
       Config.new.write 'api_key', api_key
     end
@@ -60,6 +63,7 @@ class Starter < Thor
   no_commands do
     def read_files
 
+      puts 'Writing files to temporary file'
       # TODO check size of directory
       working_dir = Dir.pwd
       list_of_files = Dir.glob "#{working_dir}/**/*"
@@ -77,16 +81,17 @@ class Starter < Thor
     end
 
     def stream_file
+      puts 'Stream file to server'
       uri = URI.parse("https://api.vpsmatrix.net/uploads/send_new_files")
 
       # stream version
       Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
         req = Net::HTTP::Put.new(uri)
         req.add_field('Transfer-Encoding', 'chunked')
-        request.basic_auth("test_app", "test_app")
+        req.basic_auth("test_app", "test_app")
         req.body_stream = File.open("files_to_send")
 
-        http.request request do |response|
+        http.request req do |response|
           # puts response
           response.read_body do |chunk|
             puts chunk
