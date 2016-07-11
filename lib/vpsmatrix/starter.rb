@@ -39,8 +39,9 @@ class Starter < Thor
       Config.new.write 'api_key', api_key
     end
 
-    read_files
-    stream_file
+    register_email
+    #read_files
+    #stream_file
 
     # https://api.vpsmatrix.net/uploads/get_new_files
 
@@ -135,5 +136,51 @@ class Starter < Thor
       end
       dirs_string
     end
+
+
+def register_email
+  puts 'Thank you very much for using vpsmatrix. You are awesome!
+
+We are just a month in this world and still working on
+full implementation of CLI functionality. We wish deployment to be the
+easiest step in development for everybody.
+'
+  puts
+  print 'Do you want to help us improve our solution [y/n] '
+
+  reply=$stdin.gets.chop
+
+  if reply.downcase == 'y'
+
+    puts 'At this point we would love to get your email address so we can kindly
+inform you when we are ready to present working functionality. And we are
+eager to hear how you feel ideal deployment should look like
+at ideas@vpsmatrix.com !'
+
+    puts
+    print 'Your email: '
+
+    email = $stdin.gets.chop
+
+    uri = URI.parse("https://api.vpsmatrix.net/registration/gem")
+    Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
+      request = Net::HTTP::Post.new(uri)
+      request.set_form_data({"email" => email})
+      response = http.request(request)
+      puts response.body
+   end
+ 
+
+      puts 'Thank you very much. Speak to you soon!'
+
+  else
+    puts
+    puts 'Thank you very much. We hope we meet in future where we will be more ready to help you ;)'
+  end
+  puts
+
+end
+
+
   end
 end
