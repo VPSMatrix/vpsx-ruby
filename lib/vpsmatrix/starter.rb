@@ -6,8 +6,8 @@ require 'uri'
 class Starter < Thor
   include Thor::Actions
 
-  desc 'deploy', 'run deploy to deploy app to VPS Matrix demo server'
-  def deploy
+  desc 'demo', 'run demo deploy to deploy app to VPS Matrix demo server'
+  def demo
 
     ##
     # check SSH key in .vpsmatrix dir, else generate new
