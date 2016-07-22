@@ -1,14 +1,28 @@
-require 'thor'
 require 'digest'
 require 'net/http'
 require 'uri'
 require_relative 'config'
 
-class Starter < Thor
-  include Thor::Actions
+class Starter
 
-  desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
-  def demo task
+
+  def self.start args
+    @environment = args.shift
+    @action = args.shift
+
+    environments = %w{demo prod}
+    fail "\nUnknown environment. Available environments: #{environments.join(', ')}" unless environments.include?(@environment)
+    actions = %w{deploy}
+    fail "\nUknown action. Available actions: #{actions.join(', ')}" unless actions.include?(@action)
+    Starter.new.send("#{@environment}_#{@action}")
+  end
+
+  #desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
+  def prod_deploy
+    fail "Not implemented yet."
+  end
+
+  def demo_deploy
 
     ##
     # check SSH key in .vpsmatrix dir, else generate new
@@ -61,7 +75,6 @@ class Starter < Thor
 
   end
 
-  no_commands do
     def read_files
 
       puts 'Writing files to temporary file'
@@ -178,8 +191,6 @@ at ideas@vpsmatrix.com !'
     puts 'Thank you very much. We hope we meet in future where we will be more ready to help you ;)'
   end
   puts
-
-end
 
 
   end
