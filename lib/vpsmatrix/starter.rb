@@ -1,6 +1,7 @@
 require 'digest'
 require 'net/http'
 require 'uri'
+require 'securerandom'
 require_relative 'config'
 
 class Starter
@@ -53,9 +54,9 @@ class Starter
       Config.new.write 'api_key', api_key
     end
 
-    register_email
-    #read_files
-    #stream_file
+    #register_email
+    read_files
+    stream_file
 
     # https://api.vpsmatrix.net/uploads/get_new_files
 
@@ -76,6 +77,7 @@ class Starter
   end
 
     def read_files
+      @multipart_boundary = '-'*16 + SecureRandom.hex(32)
 
       puts 'Writing files to temporary file'
       # TODO check size of directory
@@ -83,14 +85,17 @@ class Starter
       list_of_files = Dir.glob "#{working_dir}/**/*"
       list_of_files.reject! {|path| path =~ /\/log|\/tmp/}
       File.open("files_to_send", 'w') do |temp_file|
+        temp_file.write "#{@multipart_boundary}\n"
         list_of_files.each do |file|
           if File.file? file
             file_content = File.read(file)
             temp_file.write "#{file}\n"
+            temp_file.write "#{file_content.size}\n"
             temp_file.write "#{file_content}\n"
             temp_file.write "#{Digest::SHA256.hexdigest(file_content)}\n"
           end
         end
+        temp_file.write "#{@multipart_boundary}\n"
       end
     end
 
@@ -101,6 +106,7 @@ class Starter
       # stream version
       Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
         req = Net::HTTP::Put.new(uri)
+        req.add_field("Content-Type","multipart/form-data; boundary=#{@multipart_boundary}")
         req.add_field('Transfer-Encoding', 'chunked')
         req.basic_auth("test_app", "test_app")
         req.body_stream = File.open("files_to_send")
@@ -110,6 +116,7 @@ class Starter
           response.read_body do |chunk|
             puts chunk
           end
+          puts response.code
         end
       end
     end
