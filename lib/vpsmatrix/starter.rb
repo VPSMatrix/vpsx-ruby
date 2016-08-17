@@ -83,7 +83,7 @@ class Starter
       # TODO check size of directory
       working_dir = Dir.pwd
       list_of_files = Dir.glob "#{working_dir}/**/*"
-      list_of_files.reject! {|path| path =~ /\/log|\/tmp/}
+      list_of_files.reject! {|path| path =~ /#{working_dir}\/log|#{working_dir}\/tmp/}
       File.open("files_to_send", 'w') do |temp_file|
         temp_file.write "#{@multipart_boundary}\n"
         list_of_files.each do |file|
