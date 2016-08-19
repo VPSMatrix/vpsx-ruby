@@ -84,7 +84,7 @@ class Starter
       working_dir = Dir.pwd
       list_of_files = Dir.glob "#{working_dir}/**/*"
       list_of_files.reject! {|path| path =~ /#{working_dir}\/log|#{working_dir}\/tmp/}
-      File.open("files_to_send", 'w') do |temp_file|
+      File.open("tmp/files_to_send", 'w') do |temp_file|
         temp_file.write "#{@multipart_boundary}\n"
         list_of_files.each do |file|
           if File.file? file
