@@ -89,7 +89,7 @@ class Starter
         list_of_files.each do |file|
           if File.file? file
             file_content = File.read(file)
-            temp_file.write "#{file}\n"
+            temp_file.write "#{working_dir.split('/').last + file.split(working_dir).last}\n"
             temp_file.write "#{file_content.size}\n"
             temp_file.write "#{file_content}\n"
             temp_file.write "#{Digest::SHA256.hexdigest(file_content)}\n"
