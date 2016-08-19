@@ -84,6 +84,9 @@ class Starter
       working_dir = Dir.pwd
       list_of_files = Dir.glob "#{working_dir}/**/*"
       list_of_files.reject! {|path| path =~ /#{working_dir}\/log|#{working_dir}\/tmp/}
+      unless Dir.exists?("tmp")
+       Dir.mkdir("tmp")
+      end
       File.open("tmp/files_to_send", 'w') do |temp_file|
         temp_file.write "#{@multipart_boundary}\n"
         list_of_files.each do |file|
@@ -109,7 +112,7 @@ class Starter
         req.add_field("Content-Type","multipart/form-data; boundary=#{@multipart_boundary}")
         req.add_field('Transfer-Encoding', 'chunked')
         req.basic_auth("test_app", "test_app")
-        req.body_stream = File.open("files_to_send")
+        req.body_stream = File.open("tmp/files_to_send")
 
         http.request req do |response|
           # puts response
@@ -128,7 +131,7 @@ class Starter
       Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
         request = Net::HTTP::Put.new(uri.request_uri)
         request.basic_auth("test_app", "test_app")
-        request.set_form_data({"file" => File.read("files_to_send")})
+        request.set_form_data({"file" => File.read("tmp/files_to_send")})
         http.request request
       end
     end
