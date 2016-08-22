@@ -96,6 +96,9 @@ class Starter
             temp_file.write "#{file_content.size}\n"
             temp_file.write "#{file_content}\n"
             temp_file.write "#{Digest::SHA256.hexdigest(file_content)}\n"
+          else
+            temp_file.write "#{working_dir.split('/').last + file.split(working_dir).last}\n"
+            temp_file.write "DIR\n"
           end
         end
         temp_file.write "#{@multipart_boundary}\n"
