@@ -110,7 +110,7 @@ class Starter
       uri = URI.parse("https://api.vpsmatrix.net/uploads/send_new_files")
 
       # stream version
-      Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
+      Net::HTTP.start(uri.host, uri.port, use_ssl: true, :read_timeout => 500) do |http|
         req = Net::HTTP::Put.new(uri)
         req.add_field("Content-Type","multipart/form-data; boundary=#{@multipart_boundary}")
         req.add_field('Transfer-Encoding', 'chunked')
