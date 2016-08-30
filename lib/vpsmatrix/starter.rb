@@ -25,38 +25,23 @@ class Starter
 
   def demo_deploy
 
-    ##
-    # check SSH key in .vpsmatrix dir, else generate new
-      # generate ~/.vpsmatrix/config.yml
-      # generate ~/.vpsmatrix/id_rsa.pub
-
-    ## check for .vpsmatrix_config
-    ## no?
-      # generate .vpsmatrix_config.yml
-      # ask for API KEY
-      # write it to .vpsmatrix_config.yml
-    ## yes?
-      # read API KEY
-
-
-    # there should be only one SSH key for all apps right? So dir in home with general config and SSH key
-    # then one config file in app folder?
-    unless File.exists? ".vpsmatrix/id_rsa.pub"
-      # Generate SSH key
-      ssh_key = 'HFKNGEWIUHENINHSLN867G5867BDI7BOQ8YWQF9YFN9QWF'
+    unless Config.new.content['ssh_key']
+      Config.new.write 'ssh_key', SecureRandom.hex
     end
 
     @app_name = Dir.pwd.split(File::SEPARATOR).last
-    unless Config.new.content['api_key']
+    unless Config.new.content['api_key'] && Config.new.content['api_key'].length == 32
       # ask for it to server
       # TODO check if server returns api_key
-      api_key = send_get_request "https://api.vpsmatrix.net/uploads/get_api_key", {ssh_key: ssh_key}
-      Config.new.write 'api_key', api_key
+      api_key = send_get_request "https://api.vpsmatrix.net/uploads/get_api_key"
+      if api_key.response.code == '200'
+        Config.new.write 'api_key', api_key.response.body
+      end
     end
 
     #register_email
-    read_files
-    stream_file
+    #read_files
+    #stream_file
 
     # https://api.vpsmatrix.net/uploads/get_new_files
 
