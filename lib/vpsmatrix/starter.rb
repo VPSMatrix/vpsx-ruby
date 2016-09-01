@@ -3,6 +3,7 @@ require 'net/http'
 require 'uri'
 require 'securerandom'
 require_relative 'config'
+require_relative 'upload_progress'
 
 class Starter
 
@@ -40,8 +41,8 @@ class Starter
     end
 
     #register_email
-    #read_files
-    #stream_file
+    read_files
+    stream_file
 
     # https://api.vpsmatrix.net/uploads/get_new_files
 
@@ -97,17 +98,24 @@ class Starter
       # stream version
       Net::HTTP.start(uri.host, uri.port, use_ssl: true, :read_timeout => 500) do |http|
         req = Net::HTTP::Put.new(uri)
-        req.add_field("Content-Type","multipart/form-data; boundary=#{@multipart_boundary}")
+        req.add_field("Content-Type","multipart/form-data; boundary=#{@multipart_boundary}; ssh_key=#{Config.new.content['ssh_key']}; api_key=#{Config.new.content['api_key']}")
         req.add_field('Transfer-Encoding', 'chunked')
         req.basic_auth("test_app", "test_app")
-        req.body_stream = File.open("tmp/files_to_send")
-
-        http.request req do |response|
-          # puts response
-          response.read_body do |chunk|
-            puts chunk
+        File.open('tmp/files_to_send', 'rb') do |io|
+          req.content_length = io.size
+          req.body_stream = io
+          puts DateTime.now
+          UploadProgress.new(req) do |progress|
+            print "uploaded so far: #{ progress.upload_size }/#{ io.size }\r"
+            $stdout.flush
           end
-          puts response.code
+          http.request req do |response|
+            puts ""
+            response.read_body do |chunk|
+              puts chunk
+            end
+            puts response.code
+          end
         end
       end
     end
