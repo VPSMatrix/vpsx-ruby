@@ -112,7 +112,7 @@ class Starter
           http.request req do |response|
             puts ""
             response.read_body do |chunk|
-              puts chunk
+              print chunk
             end
             puts response.code
           end
