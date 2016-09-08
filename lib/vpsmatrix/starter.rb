@@ -104,7 +104,6 @@ class Starter
         File.open('tmp/files_to_send', 'rb') do |io|
           req.content_length = io.size
           req.body_stream = io
-          puts DateTime.now
           UploadProgress.new(req) do |progress|
             print "uploaded so far: #{ progress.upload_size }/#{ io.size }\r"
             $stdout.flush
@@ -114,7 +113,9 @@ class Starter
             response.read_body do |chunk|
               print chunk
             end
-            puts response.code
+            if response.code != '200'
+              puts response.code
+            end
           end
         end
       end
