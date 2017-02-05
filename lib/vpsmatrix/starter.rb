@@ -7,6 +7,8 @@ require_relative 'upload_progress'
 
 class Starter
 
+  API_SERVER = "https://api.vpsmatrix.net"
+  API_TEST_SERVER = "http://vpsxapi.drinkin.cz"
 
   def self.start args
     @environment = args.shift
@@ -21,7 +23,57 @@ class Starter
 
   #desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
   def prod_deploy
-    fail "Not implemented yet."
+    # read all needed config options
+    config = Config.new.content
+
+    # do some checks
+    host = config["host"]
+    user_name = config["user_name"]
+    pass = config["pass"]
+    git_url = config["git_url"]
+    git_user = config["git_user"]
+    git_pass = config["git_pass"]
+    sql_user = config["sql_user"]
+    sql_pass = config["sql_pass"]
+    server_name = config["server_name"]
+    app_name = `pwd`.split("/").last.gsub("\n", "")
+
+    unless host || user_name || pass || git_user || git_url || git_pass || sql_user || sql_pass || server_name
+      fail "Some configuration options are missing, check vpsx.yml"
+    end
+
+    # send to API and install on chosen VPS
+    puts 'Deploying app'
+    uri = URI.parse("#{API_TEST_SERVER}/uploads/deploy_to_own")
+    # stream version
+
+    Net::HTTP.start(uri.host, uri.port, :read_timeout => 500) do |http|
+      req = Net::HTTP::Put.new(uri)
+      req.add_field("Content-Type","multipart/form-data;")
+      req.add_field('Transfer-Encoding', 'chunked')
+      # add some proper authentication
+      req.basic_auth("test_app", "test_app")
+      req.set_form_data({host: host,
+                         user_name: user_name,
+                         pass: pass,
+                         git_url: git_url,
+                         git_user: git_user,
+                         git_pass: git_pass,
+                         sql_user: sql_user,
+                         sql_pass: sql_pass,
+                         server_name: server_name,
+                         app_name: app_name})
+
+      http.request req do |response|
+        puts ""
+        response.read_body do |chunk|
+          print chunk
+        end
+        if response.code != '200'
+          puts response.code
+        end
+      end
+    end
   end
 
   def demo_deploy

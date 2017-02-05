@@ -3,7 +3,7 @@ require 'yaml'
 class Config
 
   def initialize
-    @file_path = "config/vpsx.yml"
+    @file_path = "vpsx.yml"
     unless File.exists? @file_path
       Dir.mkdir "config" unless Dir.exists? "config"
       File.open(@file_path, 'w') do |file|
