@@ -1,14 +1,18 @@
 require 'digest'
 require 'net/http'
 require 'uri'
+require 'json'
 require 'securerandom'
 require_relative 'config'
 require_relative 'upload_progress'
 
+require_relative 'helpers'
+include Helpers
+
 class Starter
 
   API_SERVER = "https://api.vpsmatrix.net"
-  API_TEST_SERVER = "http://vpsxapi.drinkin.cz"
+  API_TEST_SERVER = "http://localhost:3000"
 
   def self.start args
     @environment = args.shift
@@ -21,13 +25,112 @@ class Starter
     Starter.new.send("#{@environment}_#{@action}")
   end
 
+
+  def login
+    # check ~/.vpsx.yml for api key
+    @config = Config.new("home")
+    return @config.content['api_key'] if Config.new("home").content['api_key']
+
+    puts "Getting api key"
+    email = prompt("Insert email: ")
+    p email
+    password = prompt("Insert password (provide new if new user): ")
+    res = send_put_request "#{API_TEST_SERVER}/login", {email: email, password: password}
+    json = JSON.parse(res.body)
+    case
+      when json["result"] == "ok"
+        # save api_key to ~/.vpsx.yml
+        puts json["api_key"]
+        @config.write 'api_key', json["api_key"]
+        @config.content['api_key']
+      when json["result"] == "new_account"
+        puts "Confirm your e-mail and run this script again"
+        # TODO find way how to get back after user confirmed mail (run login again?)
+        abort
+      else
+        puts "There is something very bad, call help."
+        abort
+    end
+  end
+
   #desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
   def prod_deploy
+    @user_config = Config.new("home")
+    @app_config = Config.new
+
+    # FIRST RUN in project
+    # login to VPSmatrix account - use token or username/password -> save to ~/.vpsx.yml
+    # receive API key and use it next time
+    ## VPS matrix config for user identification in home dir
+    ## register if not existing user
+    ## create account with inserted e-mail
+    ## confirm email and return (nice text)
+
+    api_key = login # use api for all the rest of communication
+
+    res = send_get_request "#{API_TEST_SERVER}/vps/list_available", {}, api_key
+
+    if res.code == "200"
+      vps_list = JSON.parse res.body
+      vps_string = vps_list.map {|vps| "#{vps["id"]}: #{vps["hostname"]} at #{vps["ip"]}"}
+      vps_id = prompt vps_string.join("\n") + "\n"
+      chosen_vps = vps_list.select {|vps| vps["id"].to_s == vps_id}.first
+      if chosen_vps.empty?
+        puts "No such vps exists. Use existing id please." # TODO let's user continue somehow (run prompt again?)
+        abort
+      else
+        # TODO is there more efficient way how to write to YML file? This just opens and closes file again and again. Maybe open it at beginning?
+        @app_config = Config.new.write("host", chosen_vps["ip"])
+        @app_config = Config.new.write("host_id", chosen_vps["id"])
+      end
+      puts chosen_vps["hostname"]
+    else
+      puts "Check your api_key in ~/.vpsx.yml; call support"
+    end
+
+
+
+
+
+
+
+
+    ## CREATE OR CHOOSE VPS
+    # if none create VPS in background (take from pool of created)
+    ## ask if to deploy to existing VPS or create new
+
+    # GET request get_list_of_vps(account)
+    # POST request create_vps(account, user_ssh_key_pub, service_ssh_key_pub, service_ssh_key_priv)
+
+    # API will check existing "service" user in VPS -> for communication between user's VPSs
+    # if not it will be created with ssh keys -> these keys will be saved to ~/.vpsx.yml (used for all other VPS)
+    # take private ssh key from existing server
+
+    # user for every app
+
+    # create user for app -> will have different deploy key for each app/user
+    # add current_user ssh pub key to deploy app user
+
+    # let user to choose upload strategy
+    ## stream all files
+    ## git pull from existing repository, then we need url, access (user/pass, insert service ssh key to your git)
+    ## ask user to add pub key to git provider -> next step open windows with github/gitlab/bitbucket
+
+
+    # let user choose where database is
+    ## mysql is installed with root user without pass
+
+    # ask for domain to put in nginx.conf
+    # pass ENV variables to set settings of projects
+    
+    # write all to config
     # read all needed config options
+
+=begin
     config = Config.new.content
 
     # do some checks
-    host = config["host"]
+    host = config["host"] # VPS used
     user_name = config["user_name"]
     pass = config["pass"]
     git_url = config["git_url"]
@@ -47,7 +150,7 @@ class Starter
     uri = URI.parse("#{API_TEST_SERVER}/uploads/deploy_to_own")
     # stream version
 
-    Net::HTTP.start(uri.host, uri.port, :read_timeout => 500) do |http|
+    Net::HTTP.start(uri.host, 3000, :read_timeout => 500) do |http|
       req = Net::HTTP::Put.new(uri)
       req.add_field("Content-Type","multipart/form-data;")
       req.add_field('Transfer-Encoding', 'chunked')
@@ -74,6 +177,7 @@ class Starter
         end
       end
     end
+=end
   end
 
   def demo_deploy
@@ -95,23 +199,6 @@ class Starter
     #register_email
     read_files
     stream_file
-
-    # https://api.vpsmatrix.net/uploads/get_new_files
-
-    # detect rails? DB in (pg, mysql, sqlite, nodb)?
-    # no? - do you wish us to check it?
-
-    # send SSH key and API KEY to API app
-
-    # -> OK
-    # upload app to API, use rsync or something easy
-
-
-    # -> return error message (no account, etc.)
-
-    # run deploy on API app
-    # receive DONE deploy -> show URL
-
   end
 
     def read_files
@@ -173,29 +260,6 @@ class Starter
       end
     end
 
-    def send_put_request
-      uri = URI.parse("https://api.vpsmatrix.net/uploads/send_new_files")
-
-      # no stream version
-      Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
-        request = Net::HTTP::Put.new(uri.request_uri)
-        request.basic_auth("test_app", "test_app")
-        request.set_form_data({"file" => File.read("tmp/files_to_send")})
-        http.request request
-      end
-    end
-
-    def send_get_request endpoint, params={} #https://api.vpsmatrix.net/uploads/get_file_list
-      uri = URI.parse(endpoint)
-      uri.query = URI.encode_www_form(params)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-      req = Net::HTTP::Get.new(uri.path)
-      req.basic_auth("test_app", "test_app")
-      http.request(req)
-      #res = Net::HTTP.get_response(uri)
-    end
-
     def read_dirs
       working_dir = Dir.pwd
       list_of_files = Dir.glob "#{working_dir}/**/*"
@@ -208,49 +272,4 @@ class Starter
       end
       dirs_string
     end
-
-
-def register_email
-  puts 'Thank you very much for using vpsmatrix. You are awesome!
-
-We are just a month in this world and still working on
-full implementation of CLI functionality. We wish deployment to be the
-easiest step in development for everybody.
-'
-  puts
-  print 'Do you want to help us improve our solution [y/n] '
-
-  reply=$stdin.gets.chop
-
-  if reply.downcase == 'y'
-
-    puts 'At this point we would love to get your email address so we can kindly
-inform you when we are ready to present working functionality. And we are
-eager to hear how you feel ideal deployment should look like
-at ideas@vpsmatrix.com !'
-
-    puts
-    print 'Your email: '
-
-    email = $stdin.gets.chop
-
-    uri = URI.parse("https://api.vpsmatrix.net/registration/gem")
-    Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
-      request = Net::HTTP::Post.new(uri)
-      request.set_form_data({"email" => email})
-      response = http.request(request)
-      puts response.body
-   end
- 
-
-      puts 'Thank you very much. Speak to you soon!'
-
-  else
-    puts
-    puts 'Thank you very much. We hope we meet in future where we will be more ready to help you ;)'
-  end
-  puts
-
-
-  end
 end
