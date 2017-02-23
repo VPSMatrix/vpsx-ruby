@@ -11,30 +11,37 @@ include Helpers
 
 class Starter
 
-  API_SERVER = "https://api.vpsmatrix.net"
-  API_TEST_SERVER = "http://localhost:3000"
+
 
   def self.start args
-    @environment = args.shift
     @action = args.shift
+    @environment = args.shift
 
-    environments = %w{demo prod}
-    fail "\nUnknown environment. Available environments: #{environments.join(', ')}" unless environments.include?(@environment)
-    actions = %w{deploy}
-    fail "\nUknown action. Available actions: #{actions.join(', ')}" unless actions.include?(@action)
-    Starter.new.send("#{@environment}_#{@action}")
+    #environments = %w{demo prod}
+    #fail "\nUnknown environment. Available environments: #{environments.join(', ')}" unless environments.include?(@environment)
+    #actions = %w{deploy init}
+    #fail "\nUknown action. Available actions: #{actions.join(', ')}" unless actions.include?(@action)
+    case @action
+      when "deploy"
+        Starter.new.send("#{@environment}_#{@action}")
+      when "config"
+        Starter.new.send(@action)
+      else
+        fail "No action like this."
+    end
   end
 
 
+  # Login user; create if not existing; add api_key to ~/.vpsx.yml for future use
   def login
     # check ~/.vpsx.yml for api key
     @config = Config.new("home")
     return @config.content['api_key'] if Config.new("home").content['api_key']
 
     puts "Getting api key"
-    email = prompt("Insert email: ")
+    email = prompt(nil, "Insert email: ")
     p email
-    password = prompt("Insert password (provide new if new user): ")
+    password = prompt(nil, "Insert password (provide new if new user): ")
     res = send_put_request "#{API_TEST_SERVER}/login", {email: email, password: password}
     json = JSON.parse(res.body)
     case
@@ -53,11 +60,38 @@ class Starter
     end
   end
 
+  # Configure how app is
+  def config
+    @app_config = Config.new
+    api_key = login
+
+    resolve_vps(api_key)
+    resolve_upload_strategy
+
+    app_name = `pwd`.split("/").last.gsub("\n", "")
+    @app_config.write("app_name", app_name)
+    ## create service user
+    # API will check existing "service" user in VPS -> for communication between user's VPSs
+    # if not it will be created with ssh keys -> these keys will be saved to ~/.vpsx.yml (used for all other VPS)
+    # take private ssh key from existing server
+    #create_app_user(api_key)
+
+    resolve_database
+    resolve_domain
+
+    ## TODO solve this
+    ## ask user for any ENV variables he may need? Like mailgun? mail server? redis? anything else?
+    # pass ENV variables to set settings of projects
+  end
+
   #desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
   def prod_deploy
-    @user_config = Config.new("home")
-    @app_config = Config.new
+    # TODO should be more sofisticated -> now in case of problems during .vpsx.yml creation there is no possibility to go back to questionnaire
 
+    return fail("There is no config file. Run vpsx init first.") unless File.exist?(".vpsx.yml") # && is_valid?
+
+
+    @app_config = Config.new
     # FIRST RUN in project
     # login to VPSmatrix account - use token or username/password -> save to ~/.vpsx.yml
     # receive API key and use it next time
@@ -66,106 +100,26 @@ class Starter
     ## create account with inserted e-mail
     ## confirm email and return (nice text)
 
+
     api_key = login # use api for all the rest of communication
 
-    res = send_get_request "#{API_TEST_SERVER}/vps/list_available", {}, api_key
-
-    if res.code == "200"
-      vps_list = JSON.parse res.body
-      vps_string = vps_list.map {|vps| "#{vps["id"]}: #{vps["hostname"]} at #{vps["ip"]}"}
-      vps_id = prompt vps_string.join("\n") + "\n"
-      chosen_vps = vps_list.select {|vps| vps["id"].to_s == vps_id}.first
-      if chosen_vps.empty?
-        puts "No such vps exists. Use existing id please." # TODO let's user continue somehow (run prompt again?)
-        abort
-      else
-        # TODO is there more efficient way how to write to YML file? This just opens and closes file again and again. Maybe open it at beginning?
-        @app_config = Config.new.write("host", chosen_vps["ip"])
-        @app_config = Config.new.write("host_id", chosen_vps["id"])
-      end
-      puts chosen_vps["hostname"]
-    else
-      puts "Check your api_key in ~/.vpsx.yml; call support"
-    end
-
-
-
-
-
-
-
-
-    ## CREATE OR CHOOSE VPS
-    # if none create VPS in background (take from pool of created)
-    ## ask if to deploy to existing VPS or create new
-
-    # GET request get_list_of_vps(account)
-    # POST request create_vps(account, user_ssh_key_pub, service_ssh_key_pub, service_ssh_key_priv)
-
-    # API will check existing "service" user in VPS -> for communication between user's VPSs
-    # if not it will be created with ssh keys -> these keys will be saved to ~/.vpsx.yml (used for all other VPS)
-    # take private ssh key from existing server
-
-    # user for every app
-
-    # create user for app -> will have different deploy key for each app/user
-    # add current_user ssh pub key to deploy app user
-
-    # let user to choose upload strategy
-    ## stream all files
-    ## git pull from existing repository, then we need url, access (user/pass, insert service ssh key to your git)
-    ## ask user to add pub key to git provider -> next step open windows with github/gitlab/bitbucket
-
-
-    # let user choose where database is
-    ## mysql is installed with root user without pass
-
-    # ask for domain to put in nginx.conf
-    # pass ENV variables to set settings of projects
-    
-    # write all to config
     # read all needed config options
-
-=begin
-    config = Config.new.content
-
-    # do some checks
-    host = config["host"] # VPS used
-    user_name = config["user_name"]
-    pass = config["pass"]
-    git_url = config["git_url"]
-    git_user = config["git_user"]
-    git_pass = config["git_pass"]
-    sql_user = config["sql_user"]
-    sql_pass = config["sql_pass"]
-    server_name = config["server_name"]
-    app_name = `pwd`.split("/").last.gsub("\n", "")
-
-    unless host || user_name || pass || git_user || git_url || git_pass || sql_user || sql_pass || server_name
-      fail "Some configuration options are missing, check vpsx.yml"
-    end
+    # TODO do some checks of validity of .vpsx.yml !!!
 
     # send to API and install on chosen VPS
     puts 'Deploying app'
-    uri = URI.parse("#{API_TEST_SERVER}/uploads/deploy_to_own")
+    uri = URI.parse("#{API_TEST_SERVER}/uploads/deploy_to_production")
+
+    #p @app_config.to_h
+
     # stream version
 
     Net::HTTP.start(uri.host, 3000, :read_timeout => 500) do |http|
       req = Net::HTTP::Put.new(uri)
       req.add_field("Content-Type","multipart/form-data;")
       req.add_field('Transfer-Encoding', 'chunked')
-      # add some proper authentication
-      req.basic_auth("test_app", "test_app")
-      req.set_form_data({host: host,
-                         user_name: user_name,
-                         pass: pass,
-                         git_url: git_url,
-                         git_user: git_user,
-                         git_pass: git_pass,
-                         sql_user: sql_user,
-                         sql_pass: sql_pass,
-                         server_name: server_name,
-                         app_name: app_name})
+      req['authorization'] = "Token token=#{api_key}"
+      req.set_form_data(@app_config.content)
 
       http.request req do |response|
         puts ""
@@ -177,7 +131,6 @@ class Starter
         end
       end
     end
-=end
   end
 
   def demo_deploy
