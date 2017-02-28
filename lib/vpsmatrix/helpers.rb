@@ -57,7 +57,7 @@ module Helpers
   # user may choose how to get files to VPS (git or directory upload)
   def resolve_upload_strategy
     # TODO add possibility to choose which remote to use
-    upload_strategy = prompt("1", "How you want to upload files? \n1: Git (origin remote will be used)\n2: Copy all files in folder\n")
+    upload_strategy = prompt("1", "How you want to upload files? \n1: Git (origin remote will be used)\n2: Copy all files in folder [NOT IMPLEMENTED]\n")
     if upload_strategy == "1"
       puts "You have no git repository." && abort unless Dir.exist?(".git")
       remote = `git remote get-url origin`.gsub("\n", '')

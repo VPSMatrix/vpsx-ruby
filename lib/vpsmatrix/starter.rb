@@ -74,7 +74,10 @@ class Starter
     # API will check existing "service" user in VPS -> for communication between user's VPSs
     # if not it will be created with ssh keys -> these keys will be saved to ~/.vpsx.yml (used for all other VPS)
     # take private ssh key from existing server
-    #create_app_user(api_key)
+
+    # TODO check if user exists
+    ssh_key_for_git = create_app_user(api_key)
+    puts ssh_key_for_git
 
     resolve_database
     resolve_domain
@@ -84,35 +87,17 @@ class Starter
     # pass ENV variables to set settings of projects
   end
 
-  #desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
   def prod_deploy
     # TODO should be more sofisticated -> now in case of problems during .vpsx.yml creation there is no possibility to go back to questionnaire
-
-    return fail("There is no config file. Run vpsx init first.") unless File.exist?(".vpsx.yml") # && is_valid?
-
+    # TODO do some checks of validity of .vpsx.yml !!!
+    return puts("There is no config file. Run vpsx config first.") && abort unless File.exist?(".vpsx.yml") # && is_valid?
 
     @app_config = Config.new
-    # FIRST RUN in project
-    # login to VPSmatrix account - use token or username/password -> save to ~/.vpsx.yml
-    # receive API key and use it next time
-    ## VPS matrix config for user identification in home dir
-    ## register if not existing user
-    ## create account with inserted e-mail
-    ## confirm email and return (nice text)
-
-
     api_key = login # use api for all the rest of communication
-
-    # read all needed config options
-    # TODO do some checks of validity of .vpsx.yml !!!
 
     # send to API and install on chosen VPS
     puts 'Deploying app'
-    uri = URI.parse("#{API_TEST_SERVER}/uploads/deploy_to_production")
-
-    #p @app_config.to_h
-
-    # stream version
+    uri = URI.parse("#{Vpsmatrix::API_TEST_SERVER}/uploads/deploy_to_production")
 
     Net::HTTP.start(uri.host, 3000, :read_timeout => 500) do |http|
       req = Net::HTTP::Put.new(uri)
@@ -133,6 +118,7 @@ class Starter
     end
   end
 
+  #desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
   def demo_deploy
 
     unless Config.new.content['ssh_key']
