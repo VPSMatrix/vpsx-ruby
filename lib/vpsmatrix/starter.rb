@@ -28,8 +28,8 @@ class Starter
       end
     end
 
-    @action = args.shift
     @environment = args.shift
+    @action = args.shift
 
     #environments = %w{demo prod}
     #fail "\nUnknown environment. Available environments: #{environments.join(', ')}" unless environments.include?(@environment)
