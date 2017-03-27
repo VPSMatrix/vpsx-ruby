@@ -1,6 +1,6 @@
 require 'yaml'
 
-class Config
+class Conf
   def initialize(home=nil)
     @file_path = ".vpsx.yml"
     @file_path = "#{ENV['HOME']}/.vpsx.yml" if home

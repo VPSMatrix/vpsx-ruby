@@ -14,6 +14,20 @@ class Starter
 
 
   def self.start args
+    if ARGV[0]=~/^-/
+      switches = ARGV.shift
+      if switches == '-hv' || switches == '-vh'
+        puts "vpsx #{Vpsmatrix::VERSION}"
+        usage
+      elsif
+      switches == '-v'
+        puts "vpsx #{Vpsmatrix::VERSION}"
+        exit
+      else
+        usage
+      end
+    end
+
     @action = args.shift
     @environment = args.shift
 
@@ -27,7 +41,7 @@ class Starter
       when "config"
         Starter.new.send(@action)
       else
-        fail "No action like this."
+        usage
     end
   end
 
@@ -35,8 +49,8 @@ class Starter
   # Login user; create if not existing; add api_key to ~/.vpsx.yml for future use
   def login
     # check ~/.vpsx.yml for api key
-    @config = Config.new("home")
-    return @config.content['api_key'] if Config.new("home").content['api_key']
+    @config = Conf.new("home")
+    return @config.content['api_key'] if Conf.new("home").content['api_key']
 
     puts "Getting api key"
     email = prompt(nil, "Insert email: ")
@@ -62,7 +76,7 @@ class Starter
 
   # Configure how app is
   def config
-    @app_config = Config.new
+    @app_config = Conf.new
     api_key = login
 
     resolve_vps(api_key)
@@ -92,7 +106,7 @@ class Starter
     # TODO do some checks of validity of .vpsx.yml !!!
     return puts("There is no config file. Run vpsx config first.") && abort unless File.exist?(".vpsx.yml") # && is_valid?
 
-    @app_config = Config.new
+    @app_config = Conf.new
     api_key = login # use api for all the rest of communication
 
     # send to API and install on chosen VPS
@@ -121,17 +135,17 @@ class Starter
   #desc 'demo deploy', 'run demo deploy to deploy app to VPS Matrix demo server'
   def demo_deploy
 
-    unless Config.new.content['ssh_key']
-      Config.new.write 'ssh_key', SecureRandom.hex
+    unless Conf.new.content['ssh_key']
+      Conf.new.write 'ssh_key', SecureRandom.hex
     end
 
     @app_name = Dir.pwd.split(File::SEPARATOR).last
-    unless Config.new.content['api_key'] && Config.new.content['api_key'].length == 32
+    unless Conf.new.content['api_key'] && Conf.new.content['api_key'].length == 32
       # ask for it to server
       # TODO check if server returns api_key
       api_key = send_get_request "https://api.vpsmatrix.net/uploads/get_api_key"
       if api_key.response.code == '200'
-        Config.new.write 'api_key', api_key.response.body
+        Conf.new.write 'api_key', api_key.response.body
       end
     end
 
@@ -176,7 +190,7 @@ class Starter
       # stream version
       Net::HTTP.start(uri.host, uri.port, use_ssl: true, :read_timeout => 500) do |http|
         req = Net::HTTP::Put.new(uri)
-        req.add_field("Content-Type","multipart/form-data; boundary=#{@multipart_boundary}; ssh_key=#{Config.new.content['ssh_key']}; api_key=#{Config.new.content['api_key']}")
+        req.add_field("Content-Type","multipart/form-data; boundary=#{@multipart_boundary}; ssh_key=#{Conf.new.content['ssh_key']}; api_key=#{Conf.new.content['api_key']}")
         req.add_field('Transfer-Encoding', 'chunked')
         req.basic_auth("test_app", "test_app")
         File.open('tmp/files_to_send', 'rb') do |io|
@@ -211,4 +225,25 @@ class Starter
       end
       dirs_string
     end
+
+  def self.usage
+    puts
+    puts 'Usage:'
+    puts 'vpsx [-options] [environment action]'
+    puts
+    puts '  Available environments: demo'
+    puts '  Available actions:      deploy'
+    puts
+    puts 'Options:'
+    puts ' -h print this help'
+    puts ' -v print version'
+    puts
+    puts 'Example:'
+    puts '  rails new fooapp'
+    puts '  cd fooapp'
+    puts '  rails g scaffold foo'
+    puts '  vpsx demo deploy'
+    exit
+  end
+
 end
